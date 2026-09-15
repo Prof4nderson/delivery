@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   postgres:
     image: postgres:16-alpine
@@ -11,7 +13,6 @@ services:
       - "${POSTGRES_PORT}:5436"
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      # Roda o schema + dados iniciais na primeira subida do container
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-delivery} -d ${POSTGRES_DB:-delivery}"]
@@ -19,13 +20,12 @@ services:
       timeout: 5s
       retries: 5
 
-volumes:
-  postgres-data:
-
-delivery-frontend:
+  delivery-frontend:
     build: .
     container_name: delivery_frontend
     ports:
-      - "3012:3000" # Ajuste a porta externa conforme a sua preferência
+      - "3012:3000"
     restart: always
 
+volumes:
+  postgres-data:
