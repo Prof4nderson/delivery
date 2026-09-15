@@ -21,3 +21,11 @@ services:
 
 volumes:
   postgres-data:
+
+delivery-frontend:
+    build: .
+    container_name: delivery_frontend
+    ports:
+      - "3012:3000" # Ajuste a porta externa conforme a sua preferência
+    restart: always
+
