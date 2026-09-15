@@ -1,7 +1,22 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
-import { Minus, Plus, ShoppingBag, Store, Bike, X } from "lucide-react";
+import {
+  ArrowRight,
+  Bike,
+  Check,
+  CircleCheck,
+  CreditCard,
+  MapPin,
+  Minus,
+  Phone,
+  Plus,
+  ReceiptText,
+  ShoppingBag,
+  Sparkles,
+  Store,
+  X,
+} from "lucide-react";
 import { toast } from "sonner";
 import { getMenuData, getSettings } from "@/lib/public.functions";
 import { createOrder } from "@/lib/orders.functions";
@@ -29,9 +44,18 @@ export const Route = createFileRoute("/")({
   head: ({ loaderData }) => ({
     meta: [
       { title: `${loaderData?.settings.restaurant_name ?? "Cardápio"} — Cardápio do dia` },
-      { name: "description", content: "Escolha seus pratos, monte o carrinho e acompanhe o pedido em tempo real." },
-      { property: "og:title", content: `${loaderData?.settings.restaurant_name ?? "Cardápio"} — Cardápio do dia` },
-      { property: "og:description", content: "Escolha seus pratos, monte o carrinho e acompanhe o pedido em tempo real." },
+      {
+        name: "description",
+        content: "Escolha seus pratos, monte o carrinho e acompanhe o pedido em tempo real.",
+      },
+      {
+        property: "og:title",
+        content: `${loaderData?.settings.restaurant_name ?? "Cardápio"} — Cardápio do dia`,
+      },
+      {
+        property: "og:description",
+        content: "Escolha seus pratos, monte o carrinho e acompanhe o pedido em tempo real.",
+      },
     ],
   }),
   component: MenuPage,
@@ -50,7 +74,6 @@ function MenuPage() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [sending, setSending] = useState(false);
 
-  // checkout form
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [orderType, setOrderType] = useState<"delivery" | "dine_in">("delivery");
@@ -60,7 +83,7 @@ function MenuPage() {
 
   const categories = menu.categories as Category[];
   const products = menu.products as Product[];
-  const dailyIds = new Set(menu.dailyIds as string[]);
+  const dailyIds = useMemo(() => new Set(menu.dailyIds as string[]), [menu.dailyIds]);
 
   const visibleByCategory = useMemo(() => {
     const map = new Map<string, Product[]>();
@@ -81,21 +104,31 @@ function MenuPage() {
         .filter((i) => i.product && i.qty > 0),
     [cart, products],
   );
-  const total = cartItems.reduce((s, i) => s + Number(i.product.price) * i.qty, 0);
-  const count = cartItems.reduce((s, i) => s + i.qty, 0);
+  const total = cartItems.reduce((sum, item) => sum + Number(item.product.price) * item.qty, 0);
+  const count = cartItems.reduce((sum, item) => sum + item.qty, 0);
+  const orderedCategories = categories.filter((c) => visibleByCategory.has(c.id));
 
   function add(id: string, delta: number) {
-    setCart((c) => {
-      const next = { ...c, [id]: Math.max(0, (c[id] ?? 0) + delta) };
+    setCart((current) => {
+      const next = { ...current, [id]: Math.max(0, (current[id] ?? 0) + delta) };
       if (next[id] === 0) delete next[id];
       return next;
     });
   }
 
   async function checkout() {
-    if (!name.trim() || !phone.trim()) { toast.error("Informe seu nome e telefone"); return; }
-    if (orderType === "delivery" && !address.trim()) { toast.error("Informe o endereço"); return; }
-    if (!cartItems.length) { toast.error("Carrinho vazio"); return; }
+    if (!name.trim() || !phone.trim()) {
+      toast.error("Informe seu nome e telefone");
+      return;
+    }
+    if (orderType === "delivery" && !address.trim()) {
+      toast.error("Informe o endereço");
+      return;
+    }
+    if (!cartItems.length) {
+      toast.error("Carrinho vazio");
+      return;
+    }
     setSending(true);
     try {
       const res = await submitOrder({
@@ -106,11 +139,11 @@ function MenuPage() {
           address: orderType === "delivery" ? address : undefined,
           payment_method: payment,
           notes: notes || undefined,
-          items: cartItems.map((i) => {
-            const note = itemNotes[i.product.id]?.trim();
+          items: cartItems.map((item) => {
+            const note = itemNotes[item.product.id]?.trim();
             return {
-              product_id: i.product.id,
-              qty: i.qty,
+              product_id: item.product.id,
+              qty: item.qty,
               ...(note ? { notes: note } : {}),
             };
           }),
@@ -128,103 +161,153 @@ function MenuPage() {
     }
   }
 
-  const orderedCategories = categories.filter((c) => visibleByCategory.has(c.id));
-
   return (
-    <div className="mx-auto min-h-screen max-w-xl pb-28">
-      {/* Header */}
-      <header className="sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur">
-        <div className="flex items-center gap-3 px-4 py-3">
+    <div className="mx-auto min-h-screen max-w-2xl pb-28">
+      <header className="sticky top-0 z-20 border-b border-border/70 bg-background/90 backdrop-blur-xl">
+        <div className="flex items-center gap-3 px-4 py-3.5">
           {settings.logo_url ? (
-            <img src={settings.logo_url} alt={settings.restaurant_name} className="h-10 w-10 rounded-full object-cover" />
+            <img
+              src={settings.logo_url}
+              alt={settings.restaurant_name}
+              className="h-11 w-11 rounded-2xl object-cover shadow-sm"
+            />
           ) : (
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground">
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
               <Store className="h-5 w-5" />
             </div>
           )}
-          <div>
-            <h1 className="font-display text-xl font-bold leading-tight">{settings.restaurant_name}</h1>
-            <p className="text-xs text-muted-foreground">Cardápio do dia</p>
+          <div className="min-w-0">
+            <p className="eyebrow">Comida feita com cuidado</p>
+            <h1 className="truncate font-display text-xl font-bold leading-tight">
+              {settings.restaurant_name}
+            </h1>
           </div>
+          {count > 0 && (
+            <button
+              onClick={() => setCartOpen(true)}
+              className="icon-button ml-auto"
+              aria-label="Abrir carrinho"
+            >
+              <ShoppingBag className="h-4 w-4" />
+              <span className="absolute -mt-7 ml-7 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                {count}
+              </span>
+            </button>
+          )}
         </div>
-        {/* Category chips */}
         <div className="flex gap-2 overflow-x-auto px-4 pb-3">
           <button
             onClick={() => setActiveCategory(null)}
-            className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium ${!activeCategory ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}
+            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${!activeCategory ? "bg-primary text-primary-foreground shadow-sm" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
           >
             Tudo
           </button>
-          {orderedCategories.map((c) => (
+          {orderedCategories.map((category) => (
             <button
-              key={c.id}
-              onClick={() => setActiveCategory(c.id)}
-              className={`whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-medium ${activeCategory === c.id ? "bg-primary text-primary-foreground" : "bg-secondary text-secondary-foreground"}`}
+              key={category.id}
+              onClick={() => setActiveCategory(category.id)}
+              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${activeCategory === category.id ? "bg-primary text-primary-foreground shadow-sm" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
             >
-              {c.name}
+              {category.name}
             </button>
           ))}
         </div>
       </header>
 
-      {/* Menu */}
-      <main className="px-4 py-4">
+      <main className="px-4 py-5">
+        <section className="page-enter relative mb-7 overflow-hidden rounded-3xl bg-foreground px-5 py-6 text-background shadow-xl sm:px-7">
+          <div className="relative z-10 max-w-sm">
+            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-background/12 px-3 py-1.5 text-xs font-semibold text-background/80">
+              <Sparkles className="h-3.5 w-3.5" /> Feito hoje, servido com carinho
+            </div>
+            <h2 className="font-display text-3xl font-bold leading-tight">
+              Seu próximo prato favorito começa aqui.
+            </h2>
+            <p className="mt-2 max-w-xs text-sm leading-6 text-background/70">
+              Escolha seus favoritos, personalize o pedido e receba tudo quentinho.
+            </p>
+          </div>
+          <div className="absolute -right-8 -top-12 h-44 w-44 rounded-full bg-primary/40 blur-2xl" />
+          <div className="absolute -bottom-20 right-8 h-44 w-44 rounded-full border-[24px] border-accent/30" />
+        </section>
+
         {orderedCategories
-          .filter((c) => !activeCategory || c.id === activeCategory)
-          .map((cat) => (
-            <section key={cat.id} className="mb-6">
-              <h2 className="font-display mb-3 text-lg font-semibold">{cat.name}</h2>
+          .filter((category) => !activeCategory || category.id === activeCategory)
+          .map((category, categoryIndex) => (
+            <section
+              key={category.id}
+              className="mb-7 page-enter"
+              style={{ animationDelay: `${80 + categoryIndex * 45}ms` }}
+            >
+              <div className="mb-3 flex items-end justify-between">
+                <div>
+                  <p className="eyebrow">Seleção da casa</p>
+                  <h2 className="font-display text-xl font-semibold">{category.name}</h2>
+                </div>
+                <span className="text-xs font-medium text-muted-foreground">
+                  {visibleByCategory.get(category.id)?.length ?? 0} opções
+                </span>
+              </div>
               <div className="space-y-3">
-                {(visibleByCategory.get(cat.id) ?? []).map((p) => {
-                  const qty = cart[p.id] ?? 0;
-                  const out = p.stock <= 0;
+                {(visibleByCategory.get(category.id) ?? []).map((product, productIndex) => {
+                  const qty = cart[product.id] ?? 0;
+                  const out = product.stock <= 0;
                   return (
-                    <article key={p.id} className="flex gap-3 rounded-2xl border border-border bg-card p-3">
-                      {p.image_url ? (
+                    <article
+                      key={product.id}
+                      className="surface-card group flex gap-3 p-3.5"
+                      style={{ animationDelay: `${productIndex * 35}ms` }}
+                    >
+                      {product.image_url ? (
                         <img
-                          src={p.image_url}
-                          alt={p.name}
+                          src={product.image_url}
+                          alt={product.name}
                           loading="lazy"
-                          className="h-20 w-20 shrink-0 rounded-xl object-cover"
+                          className="h-24 w-24 shrink-0 rounded-2xl object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                         />
                       ) : (
-                        <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-accent font-display text-2xl font-bold text-accent-foreground">
-                          {p.name.charAt(0)}
+                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-accent font-display text-3xl font-bold text-accent-foreground">
+                          {product.name.charAt(0)}
                         </div>
                       )}
                       <div className="flex min-w-0 flex-1 flex-col">
-                        <h3 className="font-medium leading-tight">{p.name}</h3>
-                        {p.description && (
-                          <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{p.description}</p>
+                        <h3 className="font-semibold leading-tight">{product.name}</h3>
+                        {product.description && (
+                          <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+                            {product.description}
+                          </p>
                         )}
-                        <div className="mt-auto flex items-center justify-between pt-2">
-                          <span className="font-semibold">{brl(p.price)}</span>
+                        <div className="mt-auto flex items-center justify-between gap-2 pt-3">
+                          <span className="font-display text-lg font-bold">
+                            {brl(product.price)}
+                          </span>
                           {out ? (
-                            <span className="rounded-full bg-muted px-3 py-1 text-xs font-medium text-muted-foreground">
+                            <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground">
                               Esgotado
                             </span>
                           ) : qty === 0 ? (
                             <button
-                              onClick={() => add(p.id, 1)}
-                              className="flex h-9 items-center gap-1 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground"
+                              onClick={() => add(product.id, 1)}
+                              className="action-button px-3.5 py-2 text-xs"
                             >
-                              <Plus className="h-4 w-4" /> Adicionar
+                              <Plus className="h-4 w-4" />
+                              Adicionar
                             </button>
                           ) : (
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2 rounded-full bg-secondary p-1">
                               <button
-                                onClick={() => add(p.id, -1)}
-                                className="flex h-9 w-9 items-center justify-center rounded-full bg-secondary"
-                                aria-label="Remover um"
+                                onClick={() => add(product.id, -1)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-background"
+                                aria-label={`Remover ${product.name}`}
                               >
                                 <Minus className="h-4 w-4" />
                               </button>
-                              <span className="w-4 text-center font-semibold">{qty}</span>
+                              <span className="w-5 text-center text-sm font-bold">{qty}</span>
                               <button
-                                onClick={() => add(p.id, 1)}
-                                disabled={qty >= p.stock}
-                                className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
-                                aria-label="Adicionar um"
+                                onClick={() => add(product.id, 1)}
+                                disabled={qty >= product.stock}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
+                                aria-label={`Adicionar ${product.name}`}
                               >
                                 <Plus className="h-4 w-4" />
                               </button>
@@ -239,115 +322,209 @@ function MenuPage() {
             </section>
           ))}
         {orderedCategories.length === 0 && (
-          <p className="py-16 text-center text-muted-foreground">Cardápio indisponível no momento.</p>
+          <div className="empty-state py-16">
+            <ReceiptText className="h-6 w-6" />
+            <p className="font-semibold">Cardápio indisponível</p>
+            <p className="text-sm text-muted-foreground">Volte em alguns instantes.</p>
+          </div>
         )}
       </main>
 
-      {/* Cart bar */}
       {count > 0 && !cartOpen && (
         <button
           onClick={() => setCartOpen(true)}
-          className="fixed inset-x-4 bottom-4 z-30 mx-auto flex max-w-xl items-center justify-between rounded-2xl bg-primary px-5 py-4 text-primary-foreground shadow-lg"
+          className="page-enter fixed inset-x-4 bottom-4 z-30 mx-auto flex max-w-2xl items-center justify-between rounded-2xl bg-primary px-5 py-4 text-primary-foreground shadow-xl shadow-primary/25"
         >
-          <span className="flex items-center gap-2 font-medium">
-            <ShoppingBag className="h-5 w-5" /> {count} {count === 1 ? "item" : "itens"}
+          <span className="flex items-center gap-2 font-semibold">
+            <ShoppingBag className="h-5 w-5" />
+            {count} {count === 1 ? "item" : "itens"}
           </span>
-          <span className="font-semibold">{brl(total)}</span>
+          <span className="flex items-center gap-1 font-bold">
+            Ver pedido <ArrowRight className="h-4 w-4" />
+          </span>
+          <span className="hidden font-display text-lg font-bold sm:block">{brl(total)}</span>
         </button>
       )}
 
-      {/* Cart / checkout sheet */}
       {cartOpen && (
-        <div className="fixed inset-0 z-40 flex flex-col justify-end bg-black/50" onClick={() => setCartOpen(false)}>
+        <div
+          className="modal-backdrop fixed inset-0 z-40 flex flex-col justify-end"
+          onClick={() => setCartOpen(false)}
+        >
           <div
-            className="max-h-[90vh] overflow-y-auto rounded-t-3xl bg-background p-5"
-            onClick={(e) => e.stopPropagation()}
+            className="modal-sheet max-h-[92vh] overflow-y-auto bg-background p-5 sm:p-7"
+            onClick={(event) => event.stopPropagation()}
           >
-            <div className="mb-4 flex items-center justify-between">
-              <h2 className="font-display text-xl font-bold">Seu pedido</h2>
-              <button onClick={() => setCartOpen(false)} aria-label="Fechar" className="rounded-full bg-secondary p-2">
-                <X className="h-5 w-5" />
-              </button>
-            </div>
+            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-border" />
+            <div className="mx-auto max-w-2xl">
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <div>
+                  <p className="eyebrow">Quase lá</p>
+                  <h2 className="font-display text-2xl font-bold">Revise seu pedido</h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Confira os itens e escolha como receber.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setCartOpen(false)}
+                  aria-label="Fechar carrinho"
+                  className="icon-button"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
 
-            <div className="space-y-2">
-              {cartItems.map(({ product, qty }) => (
-                <div key={product.id} className="rounded-xl bg-card border border-border p-3">
-                  <div className="flex items-center justify-between">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{product.name}</p>
-                      <p className="text-xs text-muted-foreground">{brl(product.price)} un.</p>
+              <div className="space-y-2">
+                {cartItems.map(({ product, qty }) => (
+                  <div key={product.id} className="rounded-2xl border border-border bg-card p-3.5">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{product.name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {brl(product.price)} por unidade
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 rounded-full bg-secondary p-1">
+                        <button
+                          onClick={() => add(product.id, -1)}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-background"
+                          aria-label="Remover item"
+                        >
+                          <Minus className="h-3.5 w-3.5" />
+                        </button>
+                        <span className="w-5 text-center text-sm font-bold">{qty}</span>
+                        <button
+                          onClick={() => add(product.id, 1)}
+                          disabled={qty >= product.stock}
+                          className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
+                          aria-label="Adicionar item"
+                        >
+                          <Plus className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <button onClick={() => add(product.id, -1)} className="flex h-8 w-8 items-center justify-center rounded-full bg-secondary" aria-label="Remover">
-                        <Minus className="h-4 w-4" />
-                      </button>
-                      <span className="w-5 text-center text-sm font-semibold">{qty}</span>
-                      <button onClick={() => add(product.id, 1)} disabled={qty >= product.stock} className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40" aria-label="Adicionar">
-                        <Plus className="h-4 w-4" />
-                      </button>
-                    </div>
+                    <input
+                      className="mt-3 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-xs"
+                      placeholder="Observação: sem cebola, ponto da carne…"
+                      maxLength={300}
+                      value={itemNotes[product.id] ?? ""}
+                      onChange={(event) =>
+                        setItemNotes((current) => ({
+                          ...current,
+                          [product.id]: event.target.value,
+                        }))
+                      }
+                    />
                   </div>
-                  <input
-                    className="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2 text-xs"
-                    placeholder="Observação: sem cebola, ponto da carne…"
-                    maxLength={300}
-                    value={itemNotes[product.id] ?? ""}
-                    onChange={(e) =>
-                      setItemNotes((n) => ({ ...n, [product.id]: e.target.value }))
-                    }
-                  />
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-5 space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <button
-                  onClick={() => setOrderType("delivery")}
-                  className={`flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-medium ${orderType === "delivery" ? "border-primary bg-primary/10" : "border-border"}`}
-                >
-                  <Bike className="h-4 w-4" /> Entrega
-                </button>
-                <button
-                  onClick={() => setOrderType("dine_in")}
-                  className={`flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-medium ${orderType === "dine_in" ? "border-primary bg-primary/10" : "border-border"}`}
-                >
-                  <Store className="h-4 w-4" /> No restaurante
-                </button>
+                ))}
               </div>
 
-              <input className="w-full rounded-xl border border-input bg-card px-4 py-3 text-sm" placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} />
-              <input className="w-full rounded-xl border border-input bg-card px-4 py-3 text-sm" placeholder="Telefone / WhatsApp" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              {orderType === "delivery" && (
-                <input className="w-full rounded-xl border border-input bg-card px-4 py-3 text-sm" placeholder="Endereço de entrega" value={address} onChange={(e) => setAddress(e.target.value)} />
-              )}
-
-              <div>
-                <p className="mb-1.5 text-sm font-medium">Pagamento</p>
-                <div className="grid grid-cols-2 gap-2">
-                  {PAYMENT_METHODS.map((m) => (
+              <div className="mt-6 space-y-4">
+                <div>
+                  <p className="mb-2 text-sm font-semibold">Como você quer receber?</p>
+                  <div className="grid grid-cols-2 gap-2">
                     <button
-                      key={m}
-                      onClick={() => setPayment(m)}
-                      className={`rounded-xl border-2 py-2.5 text-sm ${payment === m ? "border-primary bg-primary/10 font-medium" : "border-border"}`}
+                      onClick={() => setOrderType("delivery")}
+                      className={`flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-semibold ${orderType === "delivery" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card"}`}
                     >
-                      {m}
+                      <Bike className="h-4 w-4" /> Entrega
                     </button>
-                  ))}
+                    <button
+                      onClick={() => setOrderType("dine_in")}
+                      className={`flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-semibold ${orderType === "dine_in" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card"}`}
+                    >
+                      <Store className="h-4 w-4" /> No local
+                    </button>
+                  </div>
                 </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="text-sm font-semibold">
+                    Seu nome
+                    <input
+                      className="mt-1.5 w-full rounded-xl border border-input bg-card px-4 py-3 text-sm font-normal"
+                      placeholder="Como podemos chamar você?"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                    />
+                  </label>
+                  <label className="text-sm font-semibold">
+                    Telefone / WhatsApp
+                    <div className="relative mt-1.5">
+                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        className="w-full rounded-xl border border-input bg-card py-3 pl-9 pr-4 text-sm font-normal"
+                        placeholder="(00) 00000-0000"
+                        inputMode="tel"
+                        value={phone}
+                        onChange={(event) => setPhone(event.target.value)}
+                      />
+                    </div>
+                  </label>
+                </div>
+                {orderType === "delivery" && (
+                  <label className="block text-sm font-semibold">
+                    Endereço de entrega
+                    <div className="relative mt-1.5">
+                      <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <input
+                        className="w-full rounded-xl border border-input bg-card py-3 pl-9 pr-4 text-sm font-normal"
+                        placeholder="Rua, número e complemento"
+                        value={address}
+                        onChange={(event) => setAddress(event.target.value)}
+                      />
+                    </div>
+                  </label>
+                )}
+                <div>
+                  <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
+                    <CreditCard className="h-4 w-4 text-primary" /> Forma de pagamento
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {PAYMENT_METHODS.map((method) => (
+                      <button
+                        key={method}
+                        onClick={() => setPayment(method)}
+                        className={`rounded-xl border-2 py-2.5 text-sm ${payment === method ? "border-primary bg-primary/10 font-semibold text-primary" : "border-border bg-card"}`}
+                      >
+                        {method}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <label className="block text-sm font-semibold">
+                  Observações <span className="font-normal text-muted-foreground">(opcional)</span>
+                  <textarea
+                    className="mt-1.5 w-full rounded-xl border border-input bg-card px-4 py-3 text-sm font-normal"
+                    placeholder="Algum detalhe importante para o restaurante?"
+                    rows={2}
+                    value={notes}
+                    onChange={(event) => setNotes(event.target.value)}
+                  />
+                </label>
               </div>
 
-              <textarea className="w-full rounded-xl border border-input bg-card px-4 py-3 text-sm" placeholder="Observações (opcional)" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+              <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
+                <span className="text-sm text-muted-foreground">Total do pedido</span>
+                <span className="font-display text-2xl font-bold">{brl(total)}</span>
+              </div>
+              <button
+                onClick={checkout}
+                disabled={sending || count === 0}
+                className="action-button mt-4 w-full py-4 text-sm disabled:opacity-50"
+              >
+                {sending ? (
+                  "Enviando pedido…"
+                ) : (
+                  <>
+                    <CircleCheck className="h-5 w-5" /> Confirmar pedido
+                  </>
+                )}
+              </button>
+              <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
+                <Check className="h-3.5 w-3.5 text-primary" /> Você poderá acompanhar o status em
+                tempo real
+              </p>
             </div>
-
-            <button
-              onClick={checkout}
-              disabled={sending || count === 0}
-              className="mt-5 w-full rounded-2xl bg-primary py-4 font-semibold text-primary-foreground disabled:opacity-50"
-            >
-              {sending ? "Enviando…" : `Confirmar pedido • ${brl(total)}`}
-            </button>
           </div>
         </div>
       )}
