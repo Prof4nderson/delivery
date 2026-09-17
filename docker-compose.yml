@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-delivery}
       POSTGRES_DB: ${POSTGRES_DB:-delivery}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-5436}:5436"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       # Roda o schema + dados iniciais na primeira subida do container
@@ -32,10 +32,10 @@ services:
       # O app fala com o banco pelo nome do serviço dentro da rede do compose
       DATABASE_URL: postgresql://${POSTGRES_USER:-delivery}:${POSTGRES_PASSWORD:-delivery}@postgres:5432/${POSTGRES_DB:-delivery}
       PGSSL_DISABLE: "true"
-      PORT: "3000"
+      PORT: "3012"
       HOST: "0.0.0.0"
     ports:
-      - "${APP_PORT:-3000}:3000"
+      - 3012:3012
 
 volumes:
   postgres-data:
