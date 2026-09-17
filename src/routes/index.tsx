@@ -1,14 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Bike,
-  Gift,
   Heart,
-  Home,
   Minus,
   Plus,
-  ReceiptText,
   Search,
   ShoppingBag,
   Sparkles,
@@ -16,6 +13,8 @@ import {
   UtensilsCrossed,
   X,
 } from "lucide-react";
+import { BottomNav } from "@/components/bottom-nav";
+import { getFavorites, saveMyOrder, toggleFavorite } from "@/lib/local-store";
 import { toast } from "sonner";
 import { getMenuData, getSettings } from "@/lib/public.functions";
 import { createOrder } from "@/lib/orders.functions";
@@ -67,6 +66,8 @@ function MenuPage() {
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [sending, setSending] = useState(false);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  useEffect(() => setFavorites(getFavorites()), []);
 
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
@@ -145,6 +146,7 @@ function MenuPage() {
           }),
         },
       });
+      saveMyOrder({ id: res.orderId, number: res.orderNumber, total, at: new Date().toISOString() });
       toast.success(`Pedido #${res.orderNumber} confirmado!`);
       setCart({});
       setItemNotes({});
@@ -260,8 +262,13 @@ function MenuPage() {
                         ) : (
                           <div className="grid h-full w-full place-items-center text-4xl font-black text-primary">{p.name.charAt(0)}</div>
                         )}
-                        <button type="button" className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-glass text-foreground backdrop-blur-xl" aria-label="Favoritar">
-                          <Heart className="h-4 w-4" />
+                        <button
+                          type="button"
+                          onClick={() => setFavorites(toggleFavorite(p.id))}
+                          className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-glass text-foreground backdrop-blur-xl"
+                          aria-label={favorites.includes(p.id) ? "Remover dos favoritos" : "Favoritar"}
+                        >
+                          <Heart className={`h-4 w-4 ${favorites.includes(p.id) ? "fill-current text-primary" : ""}`} />
                         </button>
                       </div>
                       <div className="flex flex-1 flex-col pt-3">
@@ -299,14 +306,7 @@ function MenuPage() {
         )}
       </main>
 
-      <nav className="fixed inset-x-4 bottom-4 z-30 mx-auto grid max-w-xl grid-cols-4 gap-1 rounded-[1.6rem] border border-border bg-glass-strong p-2 text-muted-foreground shadow-2xl backdrop-blur-2xl">
-        {[{ icon: Home, label: "Início" }, { icon: Gift, label: "Ofertas" }, { icon: ReceiptText, label: "Pedidos" }, { icon: Heart, label: "Favoritos" }].map((item, idx) => (
-          <button key={item.label} type="button" className={`flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[0.68rem] font-bold ${idx === 0 ? "neon-pill text-primary" : ""}`}>
-            <item.icon className="h-4 w-4" />
-            <span className="truncate">{item.label}</span>
-          </button>
-        ))}
-      </nav>
+      <BottomNav />
 
       {count > 0 && !cartOpen && (
         <Button

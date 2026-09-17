@@ -14,6 +14,9 @@ import { Route as AdminRouteImport } from './routes/admin'
 import { Route as CaixaRouteImport } from './routes/caixa'
 import { Route as CozinhaRouteImport } from './routes/cozinha'
 import { Route as EntregaRouteImport } from './routes/entrega'
+import { Route as FavoritosRouteImport } from './routes/favoritos'
+import { Route as OfertasRouteImport } from './routes/ofertas'
+import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as PedidoIdRouteImport } from './routes/pedido.$id'
 
 const IndexRoute = IndexRouteImport.update({
@@ -41,6 +44,21 @@ const EntregaRoute = EntregaRouteImport.update({
   path: '/entrega',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FavoritosRoute = FavoritosRouteImport.update({
+  id: '/favoritos',
+  path: '/favoritos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OfertasRoute = OfertasRouteImport.update({
+  id: '/ofertas',
+  path: '/ofertas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PedidosRoute = PedidosRouteImport.update({
+  id: '/pedidos',
+  path: '/pedidos',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PedidoIdRoute = PedidoIdRouteImport.update({
   id: '/pedido/$id',
   path: '/pedido/$id',
@@ -53,6 +71,9 @@ export interface FileRoutesByFullPath {
   '/caixa': typeof CaixaRoute
   '/cozinha': typeof CozinhaRoute
   '/entrega': typeof EntregaRoute
+  '/favoritos': typeof FavoritosRoute
+  '/ofertas': typeof OfertasRoute
+  '/pedidos': typeof PedidosRoute
   '/pedido/$id': typeof PedidoIdRoute
 }
 export interface FileRoutesByTo {
@@ -61,6 +82,9 @@ export interface FileRoutesByTo {
   '/caixa': typeof CaixaRoute
   '/cozinha': typeof CozinhaRoute
   '/entrega': typeof EntregaRoute
+  '/favoritos': typeof FavoritosRoute
+  '/ofertas': typeof OfertasRoute
+  '/pedidos': typeof PedidosRoute
   '/pedido/$id': typeof PedidoIdRoute
 }
 export interface FileRoutesById {
@@ -70,13 +94,34 @@ export interface FileRoutesById {
   '/caixa': typeof CaixaRoute
   '/cozinha': typeof CozinhaRoute
   '/entrega': typeof EntregaRoute
+  '/favoritos': typeof FavoritosRoute
+  '/ofertas': typeof OfertasRoute
+  '/pedidos': typeof PedidosRoute
   '/pedido/$id': typeof PedidoIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin' | '/caixa' | '/cozinha' | '/entrega' | '/pedido/$id'
+  fullPaths:
+    | '/'
+    | '/admin'
+    | '/caixa'
+    | '/cozinha'
+    | '/entrega'
+    | '/favoritos'
+    | '/ofertas'
+    | '/pedidos'
+    | '/pedido/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin' | '/caixa' | '/cozinha' | '/entrega' | '/pedido/$id'
+  to:
+    | '/'
+    | '/admin'
+    | '/caixa'
+    | '/cozinha'
+    | '/entrega'
+    | '/favoritos'
+    | '/ofertas'
+    | '/pedidos'
+    | '/pedido/$id'
   id:
     | '__root__'
     | '/'
@@ -84,6 +129,9 @@ export interface FileRouteTypes {
     | '/caixa'
     | '/cozinha'
     | '/entrega'
+    | '/favoritos'
+    | '/ofertas'
+    | '/pedidos'
     | '/pedido/$id'
   fileRoutesById: FileRoutesById
 }
@@ -93,6 +141,9 @@ export interface RootRouteChildren {
   CaixaRoute: typeof CaixaRoute
   CozinhaRoute: typeof CozinhaRoute
   EntregaRoute: typeof EntregaRoute
+  FavoritosRoute: typeof FavoritosRoute
+  OfertasRoute: typeof OfertasRoute
+  PedidosRoute: typeof PedidosRoute
   PedidoIdRoute: typeof PedidoIdRoute
 }
 
@@ -133,6 +184,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EntregaRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/favoritos': {
+      id: '/favoritos'
+      path: '/favoritos'
+      fullPath: '/favoritos'
+      preLoaderRoute: typeof FavoritosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/ofertas': {
+      id: '/ofertas'
+      path: '/ofertas'
+      fullPath: '/ofertas'
+      preLoaderRoute: typeof OfertasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pedidos': {
+      id: '/pedidos'
+      path: '/pedidos'
+      fullPath: '/pedidos'
+      preLoaderRoute: typeof PedidosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pedido/$id': {
       id: '/pedido/$id'
       path: '/pedido/$id'
@@ -149,6 +221,9 @@ const rootRouteChildren: RootRouteChildren = {
   CaixaRoute: CaixaRoute,
   CozinhaRoute: CozinhaRoute,
   EntregaRoute: EntregaRoute,
+  FavoritosRoute: FavoritosRoute,
+  OfertasRoute: OfertasRoute,
+  PedidosRoute: PedidosRoute,
   PedidoIdRoute: PedidoIdRoute,
 }
 export const routeTree = rootRouteImport

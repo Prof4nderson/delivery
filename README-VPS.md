@@ -92,3 +92,47 @@ cat backup.sql | docker exec -i delivery-postgres psql -U delivery -d delivery
 - Nunca exponha a porta 5432 na internet; mantenha o banco acessível só ao app.
   (Se quiser máxima segurança, remova o bloco `ports:` do serviço `postgres` — o app
   continua alcançando o banco pela rede interna do compose.)
+
+## 6. Erro 502 Bad Gateway no Nginx
+
+502 significa que o Nginx está no ar, mas não conseguiu falar com o app. Verifique nesta ordem:
+
+```bash
+docker compose ps                 # o container delivery-app está "Up"?
+docker compose logs --tail=100 app
+curl -I http://127.0.0.1:3000     # deve responder 200
+```
+
+Casos mais comuns:
+
+1. **O container do app não subiu / caiu** (build falhou ou erro de conexão com o banco):
+   ```bash
+   docker compose up -d --build app
+   docker compose logs -f app
+   ```
+2. **Porta errada no Nginx**: o app escuta na `3000` (ou no valor de `APP_PORT`).
+3. **`proxy_pass` usando `localhost`**: em algumas máquinas resolve para IPv6 (`::1`)
+   e o app só escuta em IPv4. Use `127.0.0.1`.
+
+Configuração de Nginx que funciona:
+
+```nginx
+server {
+    listen 80;
+    server_name delivery.seudominio.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_read_timeout 300s;
+    }
+}
+```
+
+Depois: `sudo nginx -t && sudo systemctl reload nginx`.
