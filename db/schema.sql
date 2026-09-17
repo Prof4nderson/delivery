@@ -171,6 +171,6 @@ where not exists (select 1 from couriers);
 
 insert into app_settings (key, value) values
   ('restaurant_name', '"Sabor da Casa"'),
-  ('primary_color', '"#c2410c"'),
+  ('primary_color', '"#00d5ff"'),
   ('logo_url', 'null')
 on conflict (key) do nothing;

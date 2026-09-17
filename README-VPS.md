@@ -1,6 +1,9 @@
-# Rodando no VPS com PostgreSQL em Docker
+# Rodando no VPS com Docker
 
-O app usa **PostgreSQL puro**. A única configuração obrigatória é a variável `DATABASE_URL`.
+O app usa **PostgreSQL puro** e roda inteiro em containers Docker: um container para o
+banco e outro para o app (frontend + backend juntos). A interface já vem otimizada
+para celular, com modo escuro cyberpunk e modo claro holográfico. A única configuração obrigatória
+é o arquivo `.env`.
 
 ## 1. Configurar o `.env`
 
@@ -9,33 +12,52 @@ cp .env.example .env
 # edite usuário, senha e banco se quiser
 ```
 
-## 2. Subir o banco
+Variáveis principais:
+
+| Variável            | Padrão     | Uso                                   |
+| ------------------- | ---------- | ------------------------------------- |
+| `POSTGRES_USER`     | `delivery` | usuário do banco                      |
+| `POSTGRES_PASSWORD` | `delivery` | senha do banco (**troque!**)          |
+| `POSTGRES_DB`       | `delivery` | nome do banco                         |
+| `APP_PORT`          | `3000`     | porta onde o app fica exposto no VPS  |
+
+## 2. Subir tudo (banco + app)
 
 ```bash
-docker compose up -d
+docker compose up -d --build
 ```
 
-Na primeira subida o arquivo `db/schema.sql` é aplicado automaticamente: cria todas as
-tabelas e já insere o cardápio de exemplo, as senhas das rotas e um entregador de teste.
+Isso faz tudo:
 
-Para aplicar o schema manualmente (banco já existente):
+1. Sobe o PostgreSQL e, na **primeira** subida, aplica `db/schema.sql` automaticamente
+   (cria as tabelas e insere o cardápio de exemplo, as senhas das rotas e um entregador
+   de teste). O script é idempotente — pode ser reaplicado sem duplicar dados.
+2. Constrói a imagem do app a partir do `Dockerfile` e o sobe conectado ao banco.
+
+O app fica em `http://seu-vps:3000`. Coloque um Nginx (ou Caddy/Traefik) na frente
+para HTTPS e domínio próprio.
+
+### Subir só o banco (app fora do Docker)
+
+Se preferir rodar o app direto na máquina (sem container):
 
 ```bash
-psql "$DATABASE_URL" -f db/schema.sql
-```
-
-O script é idempotente — pode ser executado novamente sem duplicar dados.
-
-## 3. Instalar, construir e servir
-
-```bash
+docker compose up -d postgres
 bun install
-bun run build
-bun run start        # ou: pm2 start "bun run start" --name delivery
+NITRO_PRESET=node-server bun run build
+DATABASE_URL=postgresql://delivery:delivery@localhost:5432/delivery bun .output/server/index.mjs
+# ou com pm2:
+# pm2 start "bun .output/server/index.mjs" --name delivery
 ```
 
-O app fica disponível na porta configurada pelo servidor (padrão 3000). Coloque um Nginx
-na frente para HTTPS e domínio próprio.
+## 3. Comandos úteis
+
+```bash
+docker compose logs -f app        # logs do app
+docker compose logs -f postgres   # logs do banco
+docker compose up -d --build app  # reconstruir o app após mudanças no código
+docker compose down               # parar tudo (dados do banco são mantidos)
+```
 
 ## 4. Acessos iniciais
 
@@ -68,3 +90,5 @@ cat backup.sql | docker exec -i delivery-postgres psql -U delivery -d delivery
 - As telas de cozinha, entrega, caixa, admin e o acompanhamento do cliente se atualizam
   automaticamente por recarga periódica (a cada 5–15 segundos).
 - Nunca exponha a porta 5432 na internet; mantenha o banco acessível só ao app.
+  (Se quiser máxima segurança, remova o bloco `ports:` do serviço `postgres` — o app
+  continua alcançando o banco pela rede interna do compose.)

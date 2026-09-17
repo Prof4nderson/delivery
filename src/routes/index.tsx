@@ -2,25 +2,45 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState } from "react";
 import {
-  ArrowRight,
   Bike,
-  Check,
-  CircleCheck,
-  CreditCard,
-  MapPin,
+  Gift,
+  Heart,
+  Home,
   Minus,
-  Phone,
   Plus,
   ReceiptText,
+  Search,
   ShoppingBag,
   Sparkles,
   Store,
+  UtensilsCrossed,
   X,
 } from "lucide-react";
 import { toast } from "sonner";
 import { getMenuData, getSettings } from "@/lib/public.functions";
 import { createOrder } from "@/lib/orders.functions";
 import { brl, PAYMENT_METHODS } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+
+export const Route = createFileRoute("/")({
+  loader: async () => {
+    const [menu, settings] = await Promise.all([getMenuData(), getSettings()]);
+    return { menu, settings };
+  },
+  head: ({ loaderData }) => ({
+    meta: [
+      { title: `${loaderData?.settings.restaurant_name ?? "Cardápio"} — Cardápio do dia` },
+      { name: "description", content: "Escolha seus pratos, monte o carrinho e acompanhe o pedido em tempo real." },
+      { property: "og:title", content: `${loaderData?.settings.restaurant_name ?? "Cardápio"} — Cardápio do dia` },
+      { property: "og:description", content: "Escolha seus pratos, monte o carrinho e acompanhe o pedido em tempo real." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
+    ],
+  }),
+  component: MenuPage,
+});
+
+const DAILY_CATEGORY_NAME = "pratos quentes";
 
 type Product = {
   id: string;
@@ -36,33 +56,6 @@ type Product = {
 type Category = { id: string; name: string; sort_order: number };
 type Cart = Record<string, number>;
 
-export const Route = createFileRoute("/")({
-  loader: async () => {
-    const [menu, settings] = await Promise.all([getMenuData(), getSettings()]);
-    return { menu, settings };
-  },
-  head: ({ loaderData }) => ({
-    meta: [
-      { title: `${loaderData?.settings.restaurant_name ?? "Cardápio"} — Cardápio do dia` },
-      {
-        name: "description",
-        content: "Escolha seus pratos, monte o carrinho e acompanhe o pedido em tempo real.",
-      },
-      {
-        property: "og:title",
-        content: `${loaderData?.settings.restaurant_name ?? "Cardápio"} — Cardápio do dia`,
-      },
-      {
-        property: "og:description",
-        content: "Escolha seus pratos, monte o carrinho e acompanhe o pedido em tempo real.",
-      },
-    ],
-  }),
-  component: MenuPage,
-});
-
-const DAILY_CATEGORY_NAME = "pratos quentes";
-
 function MenuPage() {
   const { menu, settings } = Route.useLoaderData();
   const navigate = useNavigate();
@@ -72,6 +65,7 @@ function MenuPage() {
   const [itemNotes, setItemNotes] = useState<Record<string, string>>({});
   const [cartOpen, setCartOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
   const [sending, setSending] = useState(false);
 
   const [name, setName] = useState("");
@@ -83,52 +77,54 @@ function MenuPage() {
 
   const categories = menu.categories as Category[];
   const products = menu.products as Product[];
-  const dailyIds = useMemo(() => new Set(menu.dailyIds as string[]), [menu.dailyIds]);
+  const dailyIds = new Set(menu.dailyIds as string[]);
+  const normalizedQuery = query.trim().toLowerCase();
 
   const visibleByCategory = useMemo(() => {
     const map = new Map<string, Product[]>();
     for (const cat of categories) {
       const isDaily = cat.name.trim().toLowerCase() === DAILY_CATEGORY_NAME;
-      const list = products.filter(
-        (p) => p.category_id === cat.id && (!isDaily || dailyIds.has(p.id)),
-      );
+      const list = products.filter((p) => {
+        const availableToday = p.category_id === cat.id && (!isDaily || dailyIds.has(p.id));
+        const matchesSearch =
+          !normalizedQuery ||
+          p.name.toLowerCase().includes(normalizedQuery) ||
+          (p.description?.toLowerCase().includes(normalizedQuery) ?? false);
+        return availableToday && matchesSearch;
+      });
       if (list.length) map.set(cat.id, list);
     }
     return map;
-  }, [categories, products, dailyIds]);
+  }, [categories, products, dailyIds, normalizedQuery]);
 
   const cartItems = useMemo(
     () =>
       Object.entries(cart)
-        .map(([id, qty]) => ({ product: products.find((p) => p.id === id)!, qty }))
-        .filter((i) => i.product && i.qty > 0),
+        .map(([id, qty]) => {
+          const product = products.find((p) => p.id === id);
+          return product ? { product, qty } : null;
+        })
+        .filter((item): item is { product: Product; qty: number } => Boolean(item && item.qty > 0)),
     [cart, products],
   );
-  const total = cartItems.reduce((sum, item) => sum + Number(item.product.price) * item.qty, 0);
-  const count = cartItems.reduce((sum, item) => sum + item.qty, 0);
+  const total = cartItems.reduce((s, i) => s + Number(i.product.price) * i.qty, 0);
+  const count = cartItems.reduce((s, i) => s + i.qty, 0);
   const orderedCategories = categories.filter((c) => visibleByCategory.has(c.id));
+  const popular = orderedCategories.flatMap((c) => visibleByCategory.get(c.id) ?? []).slice(0, 4);
+  const heroProduct = popular[0];
 
   function add(id: string, delta: number) {
-    setCart((current) => {
-      const next = { ...current, [id]: Math.max(0, (current[id] ?? 0) + delta) };
+    setCart((c) => {
+      const next = { ...c, [id]: Math.max(0, (c[id] ?? 0) + delta) };
       if (next[id] === 0) delete next[id];
       return next;
     });
   }
 
   async function checkout() {
-    if (!name.trim() || !phone.trim()) {
-      toast.error("Informe seu nome e telefone");
-      return;
-    }
-    if (orderType === "delivery" && !address.trim()) {
-      toast.error("Informe o endereço");
-      return;
-    }
-    if (!cartItems.length) {
-      toast.error("Carrinho vazio");
-      return;
-    }
+    if (!name.trim() || !phone.trim()) { toast.error("Informe seu nome e telefone"); return; }
+    if (orderType === "delivery" && !address.trim()) { toast.error("Informe o endereço"); return; }
+    if (!cartItems.length) { toast.error("Carrinho vazio"); return; }
     setSending(true);
     try {
       const res = await submitOrder({
@@ -139,11 +135,11 @@ function MenuPage() {
           address: orderType === "delivery" ? address : undefined,
           payment_method: payment,
           notes: notes || undefined,
-          items: cartItems.map((item) => {
-            const note = itemNotes[item.product.id]?.trim();
+          items: cartItems.map((i) => {
+            const note = itemNotes[i.product.id]?.trim();
             return {
-              product_id: item.product.id,
-              qty: item.qty,
+              product_id: i.product.id,
+              qty: i.qty,
               ...(note ? { notes: note } : {}),
             };
           }),
@@ -162,155 +158,132 @@ function MenuPage() {
   }
 
   return (
-    <div className="mx-auto min-h-screen max-w-2xl pb-28">
-      <header className="sticky top-0 z-20 border-b border-border/70 bg-background/90 backdrop-blur-xl">
-        <div className="flex items-center gap-3 px-4 py-3.5">
-          {settings.logo_url ? (
-            <img
-              src={settings.logo_url}
-              alt={settings.restaurant_name}
-              className="h-11 w-11 rounded-2xl object-cover shadow-sm"
-            />
-          ) : (
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-              <Store className="h-5 w-5" />
-            </div>
-          )}
-          <div className="min-w-0">
-            <p className="eyebrow">Comida feita com cuidado</p>
-            <h1 className="truncate font-display text-xl font-bold leading-tight">
-              {settings.restaurant_name}
-            </h1>
-          </div>
-          {count > 0 && (
-            <button
-              onClick={() => setCartOpen(true)}
-              className="icon-button ml-auto"
-              aria-label="Abrir carrinho"
-            >
-              <ShoppingBag className="h-4 w-4" />
-              <span className="absolute -mt-7 ml-7 flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                {count}
-              </span>
-            </button>
-          )}
+    <div className="mx-auto min-h-screen max-w-xl px-4 pb-28 pt-5">
+      <header className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-4 pr-14">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-muted-foreground">Olá, seja bem-vindo</p>
+          <h1 className="font-display mt-1 text-3xl font-extrabold leading-tight text-foreground">
+            {settings.restaurant_name}
+          </h1>
+          <p className="mt-1 text-sm font-medium text-primary">Comida boa, humor melhor</p>
         </div>
-        <div className="flex gap-2 overflow-x-auto px-4 pb-3">
-          <button
-            onClick={() => setActiveCategory(null)}
-            className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${!activeCategory ? "bg-primary text-primary-foreground shadow-sm" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
-          >
-            Tudo
-          </button>
-          {orderedCategories.map((category) => (
-            <button
-              key={category.id}
-              onClick={() => setActiveCategory(category.id)}
-              className={`shrink-0 rounded-full px-4 py-2 text-sm font-semibold ${activeCategory === category.id ? "bg-primary text-primary-foreground shadow-sm" : "bg-secondary text-secondary-foreground hover:bg-accent"}`}
-            >
-              {category.name}
-            </button>
-          ))}
+        <div className="icon-tile grid h-12 w-12 shrink-0 place-items-center rounded-2xl">
+          {settings.logo_url ? (
+            <img src={settings.logo_url} alt={settings.restaurant_name} className="h-full w-full rounded-2xl object-cover" />
+          ) : (
+            <Store className="h-6 w-6 text-primary" />
+          )}
         </div>
       </header>
 
-      <main className="px-4 py-5">
-        <section className="page-enter relative mb-7 overflow-hidden rounded-3xl bg-foreground px-5 py-6 text-background shadow-xl sm:px-7">
-          <div className="relative z-10 max-w-sm">
-            <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-background/12 px-3 py-1.5 text-xs font-semibold text-background/80">
-              <Sparkles className="h-3.5 w-3.5" /> Feito hoje, servido com carinho
-            </div>
-            <h2 className="font-display text-3xl font-bold leading-tight">
-              Seu próximo prato favorito começa aqui.
-            </h2>
-            <p className="mt-2 max-w-xs text-sm leading-6 text-background/70">
-              Escolha seus favoritos, personalize o pedido e receba tudo quentinho.
-            </p>
-          </div>
-          <div className="absolute -right-8 -top-12 h-44 w-44 rounded-full bg-primary/40 blur-2xl" />
-          <div className="absolute -bottom-20 right-8 h-44 w-44 rounded-full border-[24px] border-accent/30" />
-        </section>
+      <div className="holo-input mt-5 flex items-center gap-3 rounded-2xl px-4 py-3">
+        <Search className="h-5 w-5 shrink-0 text-muted-foreground" />
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Buscar pratos, lanches e bebidas"
+          className="min-w-0 flex-1 bg-transparent text-sm font-medium text-foreground placeholder:text-muted-foreground focus:outline-none"
+        />
+      </div>
 
-        {orderedCategories
-          .filter((category) => !activeCategory || category.id === activeCategory)
-          .map((category, categoryIndex) => (
-            <section
-              key={category.id}
-              className="mb-7 page-enter"
-              style={{ animationDelay: `${80 + categoryIndex * 45}ms` }}
-            >
-              <div className="mb-3 flex items-end justify-between">
-                <div>
-                  <p className="eyebrow">Seleção da casa</p>
-                  <h2 className="font-display text-xl font-semibold">{category.name}</h2>
-                </div>
-                <span className="text-xs font-medium text-muted-foreground">
-                  {visibleByCategory.get(category.id)?.length ?? 0} opções
-                </span>
+      <nav className="mt-4 flex gap-2 overflow-x-auto pb-1">
+        <Button
+          type="button"
+          onClick={() => setActiveCategory(null)}
+          className={`shrink-0 rounded-full px-5 ${!activeCategory ? "neon-button" : "glass-card text-foreground"}`}
+          variant={activeCategory ? "ghost" : "default"}
+        >
+          Tudo
+        </Button>
+        {orderedCategories.map((c) => (
+          <Button
+            type="button"
+            key={c.id}
+            onClick={() => setActiveCategory(c.id)}
+            className={`shrink-0 rounded-full px-5 ${activeCategory === c.id ? "neon-button" : "glass-card text-foreground"}`}
+            variant={activeCategory === c.id ? "default" : "ghost"}
+          >
+            {c.name}
+          </Button>
+        ))}
+      </nav>
+
+      {heroProduct && !activeCategory && !normalizedQuery && (
+        <section className="glass-card relative mt-5 overflow-hidden rounded-[2rem] p-5">
+          <div className="absolute right-4 top-4 rounded-full bg-accent px-3 py-1 text-xs font-extrabold text-accent-foreground">
+            20% OFF
+          </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_8rem] items-end gap-3">
+            <div className="min-w-0 pb-1">
+              <p className="neon-pill inline-flex rounded-full px-3 py-1 text-xs font-bold">Combo do dia</p>
+              <h2 className="font-display mt-4 text-2xl font-extrabold leading-tight">{heroProduct.name}</h2>
+              <p className="mt-2 line-clamp-2 text-sm text-muted-foreground">{heroProduct.description}</p>
+              <div className="mt-4 flex items-center gap-3">
+                <span className="text-xl font-black text-primary">{brl(heroProduct.price)}</span>
+                <Button type="button" onClick={() => add(heroProduct.id, 1)} className="neon-button rounded-full px-4">
+                  <Plus className="h-4 w-4" /> Adicionar
+                </Button>
               </div>
-              <div className="space-y-3">
-                {(visibleByCategory.get(category.id) ?? []).map((product, productIndex) => {
-                  const qty = cart[product.id] ?? 0;
-                  const out = product.stock <= 0;
+            </div>
+            <div className="icon-tile aspect-square overflow-hidden rounded-[1.75rem]">
+              {heroProduct.image_url ? (
+                <img src={heroProduct.image_url} alt={heroProduct.name} className="h-full w-full object-cover" />
+              ) : (
+                <UtensilsCrossed className="m-auto h-12 w-12 text-primary" />
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      <main className="mt-6">
+        <div className="mb-3 flex items-end justify-between">
+          <h2 className="font-display text-xl font-extrabold">Popular agora</h2>
+          <span className="text-xs font-bold uppercase text-muted-foreground">{count} no carrinho</span>
+        </div>
+        {orderedCategories
+          .filter((c) => !activeCategory || c.id === activeCategory)
+          .map((cat) => (
+            <section key={cat.id} className="mb-7">
+              <h3 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase text-muted-foreground">
+                <Sparkles className="h-4 w-4 text-primary" /> {cat.name}
+              </h3>
+              <div className="grid grid-cols-2 gap-3">
+                {(visibleByCategory.get(cat.id) ?? []).map((p) => {
+                  const qty = cart[p.id] ?? 0;
+                  const out = p.stock <= 0;
                   return (
-                    <article
-                      key={product.id}
-                      className="surface-card group flex gap-3 p-3.5"
-                      style={{ animationDelay: `${productIndex * 35}ms` }}
-                    >
-                      {product.image_url ? (
-                        <img
-                          src={product.image_url}
-                          alt={product.name}
-                          loading="lazy"
-                          className="h-24 w-24 shrink-0 rounded-2xl object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                        />
-                      ) : (
-                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl bg-accent font-display text-3xl font-bold text-accent-foreground">
-                          {product.name.charAt(0)}
-                        </div>
-                      )}
-                      <div className="flex min-w-0 flex-1 flex-col">
-                        <h3 className="font-semibold leading-tight">{product.name}</h3>
-                        {product.description && (
-                          <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-                            {product.description}
-                          </p>
+                    <article key={p.id} className="glass-card flex min-h-64 flex-col rounded-[1.75rem] p-3">
+                      <div className="relative aspect-square overflow-hidden rounded-[1.35rem] bg-secondary">
+                        {p.image_url ? (
+                          <img src={p.image_url} alt={p.name} loading="lazy" className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="grid h-full w-full place-items-center text-4xl font-black text-primary">{p.name.charAt(0)}</div>
                         )}
+                        <button type="button" className="absolute right-2 top-2 grid h-8 w-8 place-items-center rounded-full bg-glass text-foreground backdrop-blur-xl" aria-label="Favoritar">
+                          <Heart className="h-4 w-4" />
+                        </button>
+                      </div>
+                      <div className="flex flex-1 flex-col pt-3">
+                        <h4 className="line-clamp-2 min-h-10 text-sm font-extrabold leading-tight">{p.name}</h4>
+                        {p.description && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{p.description}</p>}
                         <div className="mt-auto flex items-center justify-between gap-2 pt-3">
-                          <span className="font-display text-lg font-bold">
-                            {brl(product.price)}
-                          </span>
+                          <span className="text-sm font-black text-primary">{brl(p.price)}</span>
                           {out ? (
-                            <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-semibold text-muted-foreground">
-                              Esgotado
-                            </span>
+                            <span className="rounded-full bg-muted px-2.5 py-1 text-xs font-bold text-muted-foreground">Esgotado</span>
                           ) : qty === 0 ? (
-                            <button
-                              onClick={() => add(product.id, 1)}
-                              className="action-button px-3.5 py-2 text-xs"
-                            >
+                            <Button type="button" onClick={() => add(p.id, 1)} size="icon" className="neon-button h-9 w-9 rounded-full" aria-label="Adicionar">
                               <Plus className="h-4 w-4" />
-                              Adicionar
-                            </button>
+                            </Button>
                           ) : (
-                            <div className="flex items-center gap-2 rounded-full bg-secondary p-1">
-                              <button
-                                onClick={() => add(product.id, -1)}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-background"
-                                aria-label={`Remover ${product.name}`}
-                              >
+                            <div className="flex items-center gap-1.5">
+                              <Button type="button" onClick={() => add(p.id, -1)} size="icon" variant="secondary" className="h-8 w-8 rounded-full" aria-label="Remover um">
                                 <Minus className="h-4 w-4" />
-                              </button>
-                              <span className="w-5 text-center text-sm font-bold">{qty}</span>
-                              <button
-                                onClick={() => add(product.id, 1)}
-                                disabled={qty >= product.stock}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
-                                aria-label={`Adicionar ${product.name}`}
-                              >
+                              </Button>
+                              <span className="w-5 text-center text-sm font-black">{qty}</span>
+                              <Button type="button" onClick={() => add(p.id, 1)} disabled={qty >= p.stock} size="icon" className="neon-button h-8 w-8 rounded-full" aria-label="Adicionar um">
                                 <Plus className="h-4 w-4" />
-                              </button>
+                              </Button>
                             </div>
                           )}
                         </div>
@@ -322,209 +295,109 @@ function MenuPage() {
             </section>
           ))}
         {orderedCategories.length === 0 && (
-          <div className="empty-state py-16">
-            <ReceiptText className="h-6 w-6" />
-            <p className="font-semibold">Cardápio indisponível</p>
-            <p className="text-sm text-muted-foreground">Volte em alguns instantes.</p>
-          </div>
+          <p className="glass-card rounded-[1.75rem] py-16 text-center text-muted-foreground">Cardápio indisponível no momento.</p>
         )}
       </main>
 
+      <nav className="fixed inset-x-4 bottom-4 z-30 mx-auto grid max-w-xl grid-cols-4 gap-1 rounded-[1.6rem] border border-border bg-glass-strong p-2 text-muted-foreground shadow-2xl backdrop-blur-2xl">
+        {[{ icon: Home, label: "Início" }, { icon: Gift, label: "Ofertas" }, { icon: ReceiptText, label: "Pedidos" }, { icon: Heart, label: "Favoritos" }].map((item, idx) => (
+          <button key={item.label} type="button" className={`flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 text-[0.68rem] font-bold ${idx === 0 ? "neon-pill text-primary" : ""}`}>
+            <item.icon className="h-4 w-4" />
+            <span className="truncate">{item.label}</span>
+          </button>
+        ))}
+      </nav>
+
       {count > 0 && !cartOpen && (
-        <button
+        <Button
+          type="button"
           onClick={() => setCartOpen(true)}
-          className="page-enter fixed inset-x-4 bottom-4 z-30 mx-auto flex max-w-2xl items-center justify-between rounded-2xl bg-primary px-5 py-4 text-primary-foreground shadow-xl shadow-primary/25"
+          className="neon-button fixed inset-x-4 bottom-24 z-30 mx-auto flex h-auto max-w-xl items-center justify-between rounded-[1.35rem] px-5 py-4"
         >
-          <span className="flex items-center gap-2 font-semibold">
-            <ShoppingBag className="h-5 w-5" />
-            {count} {count === 1 ? "item" : "itens"}
+          <span className="flex items-center gap-2 font-bold">
+            <ShoppingBag className="h-5 w-5" /> {count} {count === 1 ? "item" : "itens"}
           </span>
-          <span className="flex items-center gap-1 font-bold">
-            Ver pedido <ArrowRight className="h-4 w-4" />
-          </span>
-          <span className="hidden font-display text-lg font-bold sm:block">{brl(total)}</span>
-        </button>
+          <span className="font-black">{brl(total)}</span>
+        </Button>
       )}
 
       {cartOpen && (
-        <div
-          className="modal-backdrop fixed inset-0 z-40 flex flex-col justify-end"
-          onClick={() => setCartOpen(false)}
-        >
-          <div
-            className="modal-sheet max-h-[92vh] overflow-y-auto bg-background p-5 sm:p-7"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-border" />
-            <div className="mx-auto max-w-2xl">
-              <div className="mb-5 flex items-start justify-between gap-3">
-                <div>
-                  <p className="eyebrow">Quase lá</p>
-                  <h2 className="font-display text-2xl font-bold">Revise seu pedido</h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    Confira os itens e escolha como receber.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setCartOpen(false)}
-                  aria-label="Fechar carrinho"
-                  className="icon-button"
-                >
-                  <X className="h-5 w-5" />
-                </button>
-              </div>
-
-              <div className="space-y-2">
-                {cartItems.map(({ product, qty }) => (
-                  <div key={product.id} className="rounded-2xl border border-border bg-card p-3.5">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{product.name}</p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {brl(product.price)} por unidade
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2 rounded-full bg-secondary p-1">
-                        <button
-                          onClick={() => add(product.id, -1)}
-                          className="flex h-7 w-7 items-center justify-center rounded-full bg-background"
-                          aria-label="Remover item"
-                        >
-                          <Minus className="h-3.5 w-3.5" />
-                        </button>
-                        <span className="w-5 text-center text-sm font-bold">{qty}</span>
-                        <button
-                          onClick={() => add(product.id, 1)}
-                          disabled={qty >= product.stock}
-                          className="flex h-7 w-7 items-center justify-center rounded-full bg-primary text-primary-foreground disabled:opacity-40"
-                          aria-label="Adicionar item"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
-                    </div>
-                    <input
-                      className="mt-3 w-full rounded-xl border border-input bg-background px-3 py-2.5 text-xs"
-                      placeholder="Observação: sem cebola, ponto da carne…"
-                      maxLength={300}
-                      value={itemNotes[product.id] ?? ""}
-                      onChange={(event) =>
-                        setItemNotes((current) => ({
-                          ...current,
-                          [product.id]: event.target.value,
-                        }))
-                      }
-                    />
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-6 space-y-4">
-                <div>
-                  <p className="mb-2 text-sm font-semibold">Como você quer receber?</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => setOrderType("delivery")}
-                      className={`flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-semibold ${orderType === "delivery" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card"}`}
-                    >
-                      <Bike className="h-4 w-4" /> Entrega
-                    </button>
-                    <button
-                      onClick={() => setOrderType("dine_in")}
-                      className={`flex items-center justify-center gap-2 rounded-xl border-2 py-3 text-sm font-semibold ${orderType === "dine_in" ? "border-primary bg-primary/10 text-primary" : "border-border bg-card"}`}
-                    >
-                      <Store className="h-4 w-4" /> No local
-                    </button>
-                  </div>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <label className="text-sm font-semibold">
-                    Seu nome
-                    <input
-                      className="mt-1.5 w-full rounded-xl border border-input bg-card px-4 py-3 text-sm font-normal"
-                      placeholder="Como podemos chamar você?"
-                      value={name}
-                      onChange={(event) => setName(event.target.value)}
-                    />
-                  </label>
-                  <label className="text-sm font-semibold">
-                    Telefone / WhatsApp
-                    <div className="relative mt-1.5">
-                      <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        className="w-full rounded-xl border border-input bg-card py-3 pl-9 pr-4 text-sm font-normal"
-                        placeholder="(00) 00000-0000"
-                        inputMode="tel"
-                        value={phone}
-                        onChange={(event) => setPhone(event.target.value)}
-                      />
-                    </div>
-                  </label>
-                </div>
-                {orderType === "delivery" && (
-                  <label className="block text-sm font-semibold">
-                    Endereço de entrega
-                    <div className="relative mt-1.5">
-                      <MapPin className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                      <input
-                        className="w-full rounded-xl border border-input bg-card py-3 pl-9 pr-4 text-sm font-normal"
-                        placeholder="Rua, número e complemento"
-                        value={address}
-                        onChange={(event) => setAddress(event.target.value)}
-                      />
-                    </div>
-                  </label>
-                )}
-                <div>
-                  <p className="mb-2 flex items-center gap-2 text-sm font-semibold">
-                    <CreditCard className="h-4 w-4 text-primary" /> Forma de pagamento
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    {PAYMENT_METHODS.map((method) => (
-                      <button
-                        key={method}
-                        onClick={() => setPayment(method)}
-                        className={`rounded-xl border-2 py-2.5 text-sm ${payment === method ? "border-primary bg-primary/10 font-semibold text-primary" : "border-border bg-card"}`}
-                      >
-                        {method}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <label className="block text-sm font-semibold">
-                  Observações <span className="font-normal text-muted-foreground">(opcional)</span>
-                  <textarea
-                    className="mt-1.5 w-full rounded-xl border border-input bg-card px-4 py-3 text-sm font-normal"
-                    placeholder="Algum detalhe importante para o restaurante?"
-                    rows={2}
-                    value={notes}
-                    onChange={(event) => setNotes(event.target.value)}
-                  />
-                </label>
-              </div>
-
-              <div className="mt-6 flex items-center justify-between border-t border-border pt-4">
-                <span className="text-sm text-muted-foreground">Total do pedido</span>
-                <span className="font-display text-2xl font-bold">{brl(total)}</span>
-              </div>
-              <button
-                onClick={checkout}
-                disabled={sending || count === 0}
-                className="action-button mt-4 w-full py-4 text-sm disabled:opacity-50"
-              >
-                {sending ? (
-                  "Enviando pedido…"
-                ) : (
-                  <>
-                    <CircleCheck className="h-5 w-5" /> Confirmar pedido
-                  </>
-                )}
-              </button>
-              <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs text-muted-foreground">
-                <Check className="h-3.5 w-3.5 text-primary" /> Você poderá acompanhar o status em
-                tempo real
-              </p>
+        <div className="fixed inset-0 z-40 flex flex-col justify-end bg-scrim" onClick={() => setCartOpen(false)}>
+          <div className="max-h-[90vh] overflow-y-auto rounded-t-[2rem] border border-border bg-popover p-5 shadow-2xl backdrop-blur-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-display text-2xl font-extrabold">Seu pedido</h2>
+              <Button type="button" onClick={() => setCartOpen(false)} aria-label="Fechar" size="icon" variant="secondary" className="rounded-full">
+                <X className="h-5 w-5" />
+              </Button>
             </div>
+
+            <div className="space-y-2">
+              {cartItems.map(({ product, qty }) => (
+                <div key={product.id} className="glass-card rounded-2xl p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-bold">{product.name}</p>
+                      <p className="text-xs text-muted-foreground">{brl(product.price)} un.</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Button type="button" onClick={() => add(product.id, -1)} size="icon" variant="secondary" className="h-8 w-8 rounded-full" aria-label="Remover">
+                        <Minus className="h-4 w-4" />
+                      </Button>
+                      <span className="w-5 text-center text-sm font-black">{qty}</span>
+                      <Button type="button" onClick={() => add(product.id, 1)} disabled={qty >= product.stock} size="icon" className="neon-button h-8 w-8 rounded-full" aria-label="Adicionar">
+                        <Plus className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                  <input
+                    className="holo-input mt-2 w-full rounded-xl px-3 py-2 text-xs"
+                    placeholder="Observação: sem cebola, ponto da carne…"
+                    maxLength={300}
+                    value={itemNotes[product.id] ?? ""}
+                    onChange={(e) => setItemNotes((n) => ({ ...n, [product.id]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <div className="grid grid-cols-2 gap-2">
+                <Button type="button" onClick={() => setOrderType("delivery")} variant="ghost" className={`h-auto rounded-2xl border-2 py-3 ${orderType === "delivery" ? "border-primary bg-primary/15" : "border-border"}`}>
+                  <Bike className="h-4 w-4" /> Entrega
+                </Button>
+                <Button type="button" onClick={() => setOrderType("dine_in")} variant="ghost" className={`h-auto rounded-2xl border-2 py-3 ${orderType === "dine_in" ? "border-primary bg-primary/15" : "border-border"}`}>
+                  <Store className="h-4 w-4" /> No restaurante
+                </Button>
+              </div>
+
+              <input className="holo-input w-full rounded-2xl px-4 py-3 text-sm" placeholder="Seu nome" value={name} onChange={(e) => setName(e.target.value)} />
+              <input className="holo-input w-full rounded-2xl px-4 py-3 text-sm" placeholder="Telefone / WhatsApp" inputMode="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+              {orderType === "delivery" && (
+                <input className="holo-input w-full rounded-2xl px-4 py-3 text-sm" placeholder="Endereço de entrega" value={address} onChange={(e) => setAddress(e.target.value)} />
+              )}
+
+              <div>
+                <p className="mb-1.5 text-sm font-bold">Pagamento</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {PAYMENT_METHODS.map((m) => (
+                    <Button key={m} type="button" onClick={() => setPayment(m)} variant="ghost" className={`h-auto rounded-2xl border-2 py-2.5 text-sm ${payment === m ? "border-primary bg-primary/15 font-bold" : "border-border"}`}>
+                      {m}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+
+              <textarea className="holo-input w-full rounded-2xl px-4 py-3 text-sm" placeholder="Observações gerais (opcional)" rows={2} value={notes} onChange={(e) => setNotes(e.target.value)} />
+            </div>
+
+            <Button
+              type="button"
+              onClick={checkout}
+              disabled={sending || count === 0}
+              className="neon-button mt-5 h-auto w-full rounded-[1.35rem] py-4 text-base font-black"
+            >
+              {sending ? "Enviando…" : `Confirmar pedido • ${brl(total)}`}
+            </Button>
           </div>
         </div>
       )}

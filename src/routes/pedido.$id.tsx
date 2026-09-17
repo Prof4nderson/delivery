@@ -14,6 +14,8 @@ export const Route = createFileRoute("/pedido/$id")({
       { name: "description", content: "Acompanhe o status do seu pedido em tempo real." },
       { property: "og:title", content: "Acompanhar pedido" },
       { property: "og:description", content: "Acompanhe o status do seu pedido em tempo real." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -74,28 +76,21 @@ function TrackPage() {
   const currentIdx = orderOf.indexOf(order.status);
 
   return (
-    <div className="mx-auto min-h-screen max-w-xl px-4 py-6 pb-12">
-      <Link
-        to="/"
-        className="inline-flex items-center gap-1 text-sm font-semibold text-muted-foreground hover:text-foreground"
-      >
-        ← Voltar ao cardápio
-      </Link>
+    <div className="mx-auto min-h-screen max-w-xl px-4 py-6">
+      <Link to="/" className="text-sm text-muted-foreground underline">← Voltar ao cardápio</Link>
 
-      <div className="surface-card page-enter mt-4 p-5 sm:p-6">
+      <div className="mt-4 rounded-3xl border border-border bg-card p-5">
         <div className="flex items-center justify-between">
           <div>
-            <p className="eyebrow">Acompanhamento</p>
+            <p className="text-sm text-muted-foreground">Pedido</p>
             <h1 className="font-display text-3xl font-bold">#{order.order_number}</h1>
           </div>
-          <span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-primary" />
+          <span className="rounded-full bg-primary/10 px-4 py-1.5 text-sm font-semibold text-primary">
             {ORDER_STATUS_LABELS[order.status] ?? order.status}
           </span>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">
-          {order.customer_name} • {isDelivery ? "Entrega" : "Consumo no restaurante"} •{" "}
-          {order.payment_method}
+          {order.customer_name} • {isDelivery ? "Entrega" : "Consumo no restaurante"} • {order.payment_method}
         </p>
 
         {order.status === "cancelled" ? (
@@ -103,37 +98,25 @@ function TrackPage() {
             Este pedido foi cancelado.
           </p>
         ) : (
-          <ol className="mt-7 space-y-0">
+          <ol className="mt-6 space-y-0">
             {steps.map((step, i) => {
               const stepIdx = orderOf.indexOf(step.key);
               const done = currentIdx >= stepIdx;
               const current = currentIdx === stepIdx;
               const Icon = step.icon;
               return (
-                <li
-                  key={step.key}
-                  className="flex gap-3 page-enter"
-                  style={{ animationDelay: `${i * 70}ms` }}
-                >
+                <li key={step.key} className="flex gap-3">
                   <div className="flex flex-col items-center">
-                    <div
-                      className={`flex h-10 w-10 items-center justify-center rounded-full transition-colors duration-300 ${done ? "bg-primary text-primary-foreground shadow-sm shadow-primary/25" : "bg-muted text-muted-foreground"}`}
-                    >
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-full ${done ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
                       {current && order.status !== "delivered" && order.status !== "served" ? (
                         <Clock className="h-4 w-4 animate-pulse" />
                       ) : (
                         <Icon className="h-4 w-4" />
                       )}
                     </div>
-                    {i < steps.length - 1 && (
-                      <div
-                        className={`h-8 w-0.5 ${done && currentIdx > stepIdx ? "bg-primary" : "bg-border"}`}
-                      />
-                    )}
+                    {i < steps.length - 1 && <div className={`h-8 w-0.5 ${done && currentIdx > stepIdx ? "bg-primary" : "bg-border"}`} />}
                   </div>
-                  <p className={`pt-2 text-sm ${done ? "font-semibold" : "text-muted-foreground"}`}>
-                    {step.label}
-                  </p>
+                  <p className={`pt-2 text-sm ${done ? "font-semibold" : "text-muted-foreground"}`}>{step.label}</p>
                 </li>
               );
             })}
@@ -141,21 +124,14 @@ function TrackPage() {
         )}
       </div>
 
-      <div className="surface-card page-enter-delay-1 mt-4 p-5 sm:p-6">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <PackageCheck className="h-4 w-4" />
-          </div>
-          <h2 className="font-display text-lg font-semibold">Itens do pedido</h2>
-        </div>
+      <div className="mt-4 rounded-3xl border border-border bg-card p-5">
+        <h2 className="font-display text-lg font-semibold">Itens</h2>
         <ul className="mt-3 space-y-2">
           {items.map((item) => (
             <li key={item.id} className="flex justify-between text-sm">
               <span>
                 {item.qty}× {item.name}
-                {item.notes && (
-                  <span className="block text-xs text-muted-foreground">{item.notes}</span>
-                )}
+                {item.notes && <span className="block text-xs text-muted-foreground">{item.notes}</span>}
               </span>
               <span className="font-medium">{brl(Number(item.price) * item.qty)}</span>
             </li>

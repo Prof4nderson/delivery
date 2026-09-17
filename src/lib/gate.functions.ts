@@ -7,12 +7,22 @@ const ROUTES = ["admin", "cozinha", "entrega", "caixa"] as const;
 export const unlockRoute = createServerFn({ method: "POST" })
   .inputValidator((data) => z.object({ route: z.enum(ROUTES), password: z.string() }).parse(data))
   .handler(async ({ data }) => {
-    const { q1 } = await import("./db.server");
-    const row = await q1<{ password_hash: string }>(
-      "select password_hash from route_passwords where route = $1",
-      [data.route],
-    );
-    if (!row || !passwordMatches(data.password, row.password_hash)) {
+    let expectedHash: string | null = null;
+    try {
+      const { q1 } = await import("./db.server");
+      const row = await q1<{ password_hash: string }>(
+        "select password_hash from route_passwords where route = $1",
+        [data.route],
+      );
+      expectedHash = row?.password_hash ?? null;
+    } catch (error) {
+      const { canUsePreviewFallback } = await import("./preview-fallback.server");
+      if (!canUsePreviewFallback(error)) throw error;
+      const { fallbackRoutePasswords } = await import("./fallback-store.server");
+      const plain = fallbackRoutePasswords[data.route];
+      expectedHash = plain ? hashPassword(plain) : null;
+    }
+    if (!expectedHash || !passwordMatches(data.password, expectedHash)) {
       return { ok: false as const };
     }
     const session = await getOpsSession();

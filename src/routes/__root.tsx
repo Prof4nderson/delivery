@@ -12,6 +12,7 @@ import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { ThemeToggle } from "../components/theme-toggle";
 import { getSettings } from "../lib/public.functions";
 
 function NotFoundComponent() {
@@ -94,7 +95,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Work+Sans:wght@400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700;800&display=swap",
       },
     ],
   }),
@@ -106,7 +107,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" className="dark">
       <head>
         <HeadContent />
       </head>
@@ -126,6 +127,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <style>{`:root{--primary:${settings.primary_color};--ring:${settings.primary_color};}`}</style>
       <Outlet />
+      <ThemeToggle />
       <Toaster position="top-center" richColors closeButton />
     </QueryClientProvider>
   );

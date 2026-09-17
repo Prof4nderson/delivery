@@ -18,31 +18,55 @@ async function adminDb() {
 // ---------- Visão geral ----------
 
 export const getAdminData = createServerFn({ method: "GET" }).handler(async () => {
-  const { q } = await adminDb();
-  const [categories, products, daily, couriers, shifts, recentOrders] = await Promise.all([
-    q<CategoryRow>("select * from categories order by sort_order, name"),
-    q<ProductRow>("select * from products order by name"),
-    q<DailyMenuRow>("select * from daily_menu"),
-    q<CourierRow>(
-      "select id, name, phone, email, vehicle_plate, active, created_at from couriers order by name",
-    ),
-    q<ShiftRow>("select * from shifts order by opened_at desc limit 20"),
-    q<{
-      id: string;
-      order_number: number;
-      customer_name: string;
-      total: string | number;
-      status: string;
-      order_type: string;
-      payment_method: string;
-      courier_name: string | null;
-      created_at: string;
-    }>(
-      `select id, order_number, customer_name, total, status, order_type, payment_method, courier_name, created_at
-       from orders order by created_at desc limit 50`,
-    ),
-  ]);
-  return { categories, products, daily, couriers, shifts, recentOrders };
+  try {
+    const { q } = await adminDb();
+    const [categories, products, daily, couriers, shifts, recentOrders] = await Promise.all([
+      q<CategoryRow>("select * from categories order by sort_order, name"),
+      q<ProductRow>("select * from products order by name"),
+      q<DailyMenuRow>("select * from daily_menu"),
+      q<CourierRow>(
+        "select id, name, phone, email, vehicle_plate, active, created_at from couriers order by name",
+      ),
+      q<ShiftRow>("select * from shifts order by opened_at desc limit 20"),
+      q<{
+        id: string;
+        order_number: number;
+        customer_name: string;
+        total: string | number;
+        status: string;
+        order_type: string;
+        payment_method: string;
+        courier_name: string | null;
+        created_at: string;
+      }>(
+        `select id, order_number, customer_name, total, status, order_type, payment_method, courier_name, created_at
+         from orders order by created_at desc limit 50`,
+      ),
+    ]);
+    return { categories, products, daily, couriers, shifts, recentOrders };
+  } catch (error) {
+    const { canUsePreviewFallback } = await import("./preview-fallback.server");
+    if (!canUsePreviewFallback(error)) throw error;
+    const { getFallbackAdminData } = await import("./fallback-store.server");
+    return getFallbackAdminData() as unknown as {
+      categories: CategoryRow[];
+      products: ProductRow[];
+      daily: DailyMenuRow[];
+      couriers: CourierRow[];
+      shifts: ShiftRow[];
+      recentOrders: {
+        id: string;
+        order_number: number;
+        customer_name: string;
+        total: string | number;
+        status: string;
+        order_type: string;
+        payment_method: string;
+        courier_name: string | null;
+        created_at: string;
+      }[];
+    };
+  }
 });
 
 // ---------- Categorias ----------
